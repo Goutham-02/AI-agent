@@ -4,15 +4,23 @@ import cors from 'cors';
 import userRoutes from "./routes/user.js";
 import ticketRoutes from "./routes/ticket.js";
 import { serve } from "inngest/express";
-import inngest from './inngest/client.js';
+import { inngest } from './inngest/client.js';
 import { onUserSignup } from "./inngest/functions/on-signup.js";
-import { onTicketCreated } from "./inngest/functions/on-ticket-created.js";
+import { onTicketCreated } from "./inngest/functions/on-ticket-create.js";
+import dotenv from 'dotenv';
 
-const PORT = process.env.PORT || 3000;
+dotenv.config();
 
-const app = express()
+const PORT = process.env.PORT;
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+    throw new Error("MongoDB URI not found in environment variables");
+}
+
+const app = express();
 app.use(cors());
-app.use(express.json())
+app.use(express.json());
 
 app.use("/api/auth", userRoutes);
 app.use("/api/tickets", ticketRoutes);
@@ -23,9 +31,12 @@ app.use("/api/inngest", serve({
 }));
 
 mongoose
-    .connect(process.env.MONGO_URI)
+    .connect(MONGO_URI)
     .then(() => {
-        console.log("MongoDB Connected");
-        app.listen(PORT, () => console.log("Server running at 3000"));
+        console.log("✅ MongoDB Connected");
+        app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
     })
-    .catch((e) => console.error(e));
+    .catch((err) => {
+        console.error("❌ MongoDB connection error:", err);
+        process.exit(1);
+    });
