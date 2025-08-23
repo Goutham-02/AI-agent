@@ -1,22 +1,25 @@
 import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
 
-export const sendMail = async (to, subject, from) => {
+dotenv.config();
+
+export const sendMail = async (to, subject, text) => {
     try {
         const transporter = nodemailer.createTransport({
-            host: process.env.AILTRAP_SMTP_HOST,
-            port: process.env.AILTRAP_SMTP_PORT,
+            host: process.env.MAILTRAP_SMTP_HOST,
+            port: process.env.MAILTRAP_SMTP_PORT,
             secure: false,
             auth: {
-                user: process.env.AILTRAP_SMTP_USER,
-                pass: process.env.AILTRAP_SMTP_PASS,
+                user: process.env.MAILTRAP_SMTP_USER,
+                pass: process.env.MAILTRAP_SMTP_PASS,
             },
         });
 
         const info = await transporter.sendMail({
-            from: 'NOREPLY Inngest',
+            from: '"Inngest Team" <noreply@inngest.com>',
             to,
             subject,
-            text
+            text,
         });
 
         console.log("Message sent:", info.messageId);
@@ -25,4 +28,4 @@ export const sendMail = async (to, subject, from) => {
         console.error(error);
         throw error;
     }
-}
+};

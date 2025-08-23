@@ -18,6 +18,7 @@ if (!MONGO_URI) {
     throw new Error("MongoDB URI not found in environment variables");
 }
 
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -25,7 +26,19 @@ app.use(express.json());
 app.use("/api/auth", userRoutes);
 app.use("/api/tickets", ticketRoutes);
 
-app.use("/api/inngest", serve({
+// Test endpoint
+app.get("/api/test", (req, res) => {
+    res.json({ 
+        message: "Backend is working",
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        hasMongoUri: !!process.env.MONGO_URI,
+        port: process.env.PORT
+    });
+});
+
+app.use("/api/inngest", (req, res, next) => {
+    next();
+}, serve({
     client: inngest,
     functions: [onUserSignup, onTicketCreated]
 }));

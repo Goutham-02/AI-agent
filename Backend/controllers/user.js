@@ -1,38 +1,52 @@
+
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/user.js';
 import { inngest } from "../inngest/client.js";
 
+console.log("[user.js] Controller file loaded");
+
 export const signup = async (req, res) => {
-    const { email, password, skills = [] } = req.body;
+    const { email, password, role = "user", skills = [] } = req.body;
     try {
-        const hashed = bcrypt.hash(password, 10);
-        const user = await User.create({ email, password: hashed, skills })
+        console.log("[signup] Signup called with email:", email, "role:", role);
+        
+        // Validate role
+        if (!["user", "moderator", "admin"].includes(role)) {
+            return res.status(400).json({ error: "Invalid role. Must be user, moderator, or admin" });
+        }
+        
+        const hashed = await bcrypt.hash(password, 10);
+        const user = await User.create({ email, password: hashed, role, skills });
 
         // fire inngest
-        await inngest.send({
-            name: "user/signup",
-            data: {
-                email: email
-            }
-        });
+        try {
+            const inngestResult = await inngest.send({
+                name: "user/signup",
+                data: { email, role }
+            });
+            console.log("[signup] Inngest event sent:", inngestResult);
+        } catch (inngestErr) {
+            console.error("[signup] Error sending Inngest event:", inngestErr);
+        }
 
         const token = jwt.sign(
-            {
-                _id: user._id,
-                role: user.role
-            },
+            { _id: user._id, role: user.role },
             process.env.JWT_SECRET
         );
-        res.json({ user, token });
 
+        res.json({ user, token });
     } catch (error) {
-        req.status(500), json({ error: "signup failed", details: error.message });
+        console.error("[signup] Signup failed:", error);
+        if (error.code === 11000) {
+            return res.status(400).json({ error: "Email already exists" });
+        }
+        res.status(500).json({ error: "signup failed", details: error.message });
     }
 };
 
 export const login = async (req, res) => {
-    const { email, password } = res.body;
+    const { email, password } = req.body;
     try {
         const user = await User.findOne({ email });
         if (!user) return res.status(401).json({ error: "user not found" });
@@ -51,21 +65,16 @@ export const login = async (req, res) => {
         res.json({ user, token });
 
     } catch (error) {
-        req.status(500), json({ error: "Login failed", details: error.message });
+        res.status(500).json({ error: "Login failed", details: error.message });
     }
 };
 
 export const logout = async (req, res) => {
     try {
-        const token = req.headers.authorization.split(' ')[1];
-        if (!token) res.status(401).json({ error: "Unauthorized" })
-        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-            if (err)
-                return res.status(401).json({ error: "Unouthorized" });
-            res.json({ message: "Logout Successfully" });
-        })
+        res.json({ message: "Logout successful" });
     } catch (error) {
-
+        console.error("[logout] Error:", error);
+        res.status(500).json({ error: "Logout failed" });
     }
 };
 
@@ -75,12 +84,22 @@ export const updateUser = async (req, res) => {
         if (req.user?.role !== "admin") {
             return res.status(403).json({ error: "Forbidden" });
         }
-        const user = User.findOne({ email });
-        if (!user) return res.status(401).json({ error: "User not found" });
+        
+        if (role && !["user", "moderator", "admin"].includes(role)) {
+            return res.status(400).json({ error: "Invalid role" });
+        }
+        
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ error: "User not found" });
+        
         await User.updateOne(
             { email },
-            { skills: skills.length ? skills : user.skills, role }
-        )
+            { 
+                skills: skills.length ? skills : user.skills, 
+                role: role || user.role 
+            }
+        );
+        
         return res.json({ message: "User updated successfully" });
     } catch (error) {
         return res.status(500).json({ error: "Update failed", details: error.message });
@@ -89,12 +108,23 @@ export const updateUser = async (req, res) => {
 
 export const getUsers = async (req, res) => {
     try {
-        if (req.user.role !== admin) {
+        console.log("[getUsers] Request from user:", {
+            userId: req.user._id,
+            role: req.user.role,
+            isAdmin: req.user.role === "admin"
+        });
+        
+        if (req.user?.role !== "admin") {
+            console.log("[getUsers] Access denied - user role:", req.user?.role);
             return res.status(403).json({ error: "Forbidden" });
         }
-        const user = await User.find().select("-password");
-        return res.json({ user });
+        
+        console.log("[getUsers] Admin access granted, fetching users...");
+        const users = await User.find().select("-password");
+        console.log("[getUsers] Found users:", users.length);
+        return res.json({ users });
     } catch (error) {
-        return res.status(500).json({ error: "Failed to retrieve user", details: error.message });
+        console.error("[getUsers] Error:", error);
+        return res.status(500).json({ error: "Failed to retrieve users", details: error.message });
     }
 };

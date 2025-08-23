@@ -49,17 +49,13 @@ const analyzeTicket = async (ticket) => {
     - Title: ${ticket.title}
     - Description: ${ticket.description}`);
 
-    const raw = response.output[0].context
-
+    console.log(response.raw);
     try {
-        const match = raw.match(/```json\s*([\s\S]*?)\s*```/i);
-        const jsonString = match ? match[1] : raw.trim();
-        return JSON.parse(jsonString);
+        return JSON.parse(raw.trim());
     } catch (error) {
-        console.error("Failed to parse JSON from AI response" + e.message);
-        return null;
+        console.error("Failed to parse AI JSON:", raw);
+        throw error;
     }
-}
-
+};
 
 export default analyzeTicket;
