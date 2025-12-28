@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 export default function SignupPage() {
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "", role: "user", skills: "" });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -14,28 +15,27 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_URL}/auth/signup`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(form),
-        }
+      const payload = { ...form };
+      if (payload.role === "moderator" && typeof payload.skills === "string") {
+        payload.skills = payload.skills.split(",").map(s => s.trim()).filter(Boolean);
+      } else {
+        payload.skills = []; // Ensure empty array for others
+      }
+
+      const res = await axios.post(
+        `${process.env.VITE_SERVER_URL}/auth/signup`,
+        payload
       );
 
-      const data = await res.json();
-
-      if (res.ok) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
+      if (res.status === 201) {
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("user", JSON.stringify(res.data.user));
         navigate("/");
       } else {
-        alert(data.message || "Signup failed");
+        alert(res.data.message || "Signup failed");
       }
     } catch (err) {
-      alert("Something went wrong");
+      alert(err.response?.data?.message || "Something went wrong");
       console.error(err);
     } finally {
       setLoading(false);
@@ -66,7 +66,30 @@ export default function SignupPage() {
             value={form.password}
             onChange={handleChange}
             required
+            autoComplete="current-password"
           />
+
+          <select
+            name="role"
+            className="select select-bordered w-full"
+            value={form.role}
+            onChange={handleChange}
+          >
+            <option value="user">User</option>
+            <option value="moderator">Moderator</option>
+            <option value="admin">Admin</option>
+          </select>
+
+          {form.role === "moderator" && (
+            <input
+              type="text"
+              name="skills"
+              placeholder="Skills (comma separated, e.g. React, Node)"
+              className="input input-bordered"
+              value={form.skills}
+              onChange={handleChange}
+            />
+          )}
 
           <div className="form-control mt-4">
             <button

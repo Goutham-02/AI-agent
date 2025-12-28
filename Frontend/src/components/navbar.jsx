@@ -33,10 +33,17 @@ export default function Navbar() {
         ) : (
           <>
             <p>Hi, {user?.email}</p>
-            {user && user?.role === "admin" ? (
-              <Link to="/admin" className="btn btn-sm">
-                Admin
-              </Link>
+            {user && ["admin", "moderator"].includes(user.role) ? (
+              <>
+                <Link to="/graph" className="btn btn-sm btn-accent">
+                  Graph View
+                </Link>
+                {user.role === "admin" && (
+                  <Link to="/admin" className="btn btn-sm">
+                    Admin
+                  </Link>
+                )}
+              </>
             ) : null}
             <button onClick={logout} className="btn btn-sm">
               Logout

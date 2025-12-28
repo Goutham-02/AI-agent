@@ -5,12 +5,17 @@ import { sendMail } from "../../utils/mailer.js";
 import analyzeTicket from "../../utils/ai.js";
 import User from "../../models/user.js";
 import mongoose from "mongoose";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { findSimilarTickets, initVectorIndex } from "../../utils/graph.js";
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
 
 export const onTicketCreated = inngest.createFunction(
     { id: "on-ticket-created", retries: 2 },
     { event: "ticket/created" },
     async ({ event, step }) => {
-        const { ticketId } = event.data;
+        const { ticketId, title, description } = event.data;
 
         // Validate ObjectId before querying
         if (!mongoose.Types.ObjectId.isValid(ticketId)) {
@@ -27,9 +32,22 @@ export const onTicketCreated = inngest.createFunction(
             await Ticket.findByIdAndUpdate(ticket._id, { status: "TODO" });
         });
 
-        const aiResponse = await step.run("analyze-ticket", async () => {
-            return await analyzeTicket(ticket);
+        // RAG Step: Retrieve similar tickets
+        const previousTickets = await step.run("find-similar-tickets", async () => {
+            try {
+                await initVectorIndex();
+                const textToEmbed = `Title: ${title}\nDescription: ${description}`;
+                const result = await model.embedContent(textToEmbed);
+                const embedding = result.embedding.values;
+                const similar = await findSimilarTickets(embedding);
+                return similar;
+            } catch (err) {
+                console.error("RAG Lookup Failed", err);
+                return [];
+            }
         });
+
+        const aiResponse = await analyzeTicket(ticket, previousTickets);
 
         const relatedSkills = await step.run("ai-processing", async () => {
             let skills = [];

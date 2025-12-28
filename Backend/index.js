@@ -7,6 +7,7 @@ import { serve } from "inngest/express";
 import { inngest } from './inngest/client.js';
 import { onUserSignup } from "./inngest/functions/on-signup.js";
 import { onTicketCreated } from "./inngest/functions/on-ticket-create.js";
+import { onTicketResolved } from "./inngest/functions/on-ticket-resolved.js";
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -28,7 +29,7 @@ app.use("/api/tickets", ticketRoutes);
 
 // Test endpoint
 app.get("/api/test", (req, res) => {
-    res.json({ 
+    res.json({
         message: "Backend is working",
         hasJwtSecret: !!process.env.JWT_SECRET,
         hasMongoUri: !!process.env.MONGO_URI,
@@ -40,7 +41,7 @@ app.use("/api/inngest", (req, res, next) => {
     next();
 }, serve({
     client: inngest,
-    functions: [onUserSignup, onTicketCreated]
+    functions: [onUserSignup, onTicketCreated, onTicketResolved]
 }));
 
 mongoose

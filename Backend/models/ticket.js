@@ -19,6 +19,7 @@ const ticketSchema = new mongoose.Schema({
     deadline: Date,
     helpfulNotes: String,
     relatedSkills: [String],
+    resolution: String,
     createdAt: { type: Date, default: Date.now }
 }, { timestamps: true })
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import axios from "axios";
 
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
@@ -15,18 +16,13 @@ export default function AdminPanel() {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/auth/users`, {
+      const res = await axios.get(`${process.env.VITE_SERVER_URL}/auth/users`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      const data = await res.json();
-      if (res.ok) {
-        setUsers(data);
-        setFilteredUsers(data);
-      } else {
-        console.error(data.error);
-      }
+      setUsers(res.data);
+      setFilteredUsers(res.data);
     } catch (err) {
       console.error("Error fetching users", err);
     }
@@ -42,28 +38,25 @@ export default function AdminPanel() {
 
   const handleUpdate = async () => {
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_URL}/auth/update-user`,
+      const res = await axios.post(
+        `${process.env.VITE_SERVER_URL}/auth/update-user`,
         {
-          method: "POST",
+          email: editingUser,
+          role: formData.role,
+          skills: formData.skills
+            .split(",")
+            .map((skill) => skill.trim())
+            .filter(Boolean),
+        },
+        {
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            email: editingUser,
-            role: formData.role,
-            skills: formData.skills
-              .split(",")
-              .map((skill) => skill.trim())
-              .filter(Boolean),
-          }),
         }
       );
 
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(data.error || "Failed to update user");
+      if (res.status !== 200) {
+        console.error(res.data.error || "Failed to update user");
         return;
       }
 
@@ -98,23 +91,32 @@ export default function AdminPanel() {
           key={user._id}
           className="bg-base-100 shadow rounded p-4 mb-4 border"
         >
-          <p>
-            <strong>Email:</strong> {user.email}
-          </p>
-          <p>
-            <strong>Current Role:</strong> {user.role}
-          </p>
-          <p>
-            <strong>Skills:</strong>{" "}
-            {user.skills && user.skills.length > 0
-              ? user.skills.join(", ")
-              : "N/A"}
-          </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="font-bold">{user.email}</p>
+              <p className="text-sm">Role: {user.role}</p>
+              <p className="text-sm">Skills: {user.skills?.join(", ")}</p>
+            </div>
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => handleEditClick(user)}
+            >
+              Edit
+            </button>
+          </div>
+        </div>
+      ))}
 
-          {editingUser === user.email ? (
-            <div className="mt-4 space-y-2">
+      {editingUser && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Edit User: {editingUser}</h3>
+            <div className="form-control w-full mt-4">
+              <label className="label">
+                <span className="label-text">Role</span>
+              </label>
               <select
-                className="select select-bordered w-full"
+                className="select select-bordered"
                 value={formData.role}
                 onChange={(e) =>
                   setFormData({ ...formData, role: e.target.value })
@@ -124,42 +126,37 @@ export default function AdminPanel() {
                 <option value="moderator">Moderator</option>
                 <option value="admin">Admin</option>
               </select>
-
+            </div>
+            <div className="form-control w-full mt-4">
+              <label className="label">
+                <span className="label-text">Skills (comma separated)</span>
+              </label>
               <input
                 type="text"
-                placeholder="Comma-separated skills"
-                className="input input-bordered w-full"
+                className="input input-bordered"
                 value={formData.skills}
                 onChange={(e) =>
                   setFormData({ ...formData, skills: e.target.value })
                 }
               />
-
-              <div className="flex gap-2">
-                <button
-                  className="btn btn-success btn-sm"
-                  onClick={handleUpdate}
-                >
-                  Save
-                </button>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setEditingUser(null)}
-                >
-                  Cancel
-                </button>
-              </div>
             </div>
-          ) : (
-            <button
-              className="btn btn-primary btn-sm mt-2"
-              onClick={() => handleEditClick(user)}
-            >
-              Edit
-            </button>
-          )}
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setEditingUser(null);
+                  setFormData({ role: "", skills: "" });
+                }}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleUpdate}>
+                Save
+              </button>
+            </div>
+          </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import axios from "axios";
 
 export default function TicketDetailsPage() {
   const { id } = useParams();
@@ -9,31 +10,30 @@ export default function TicketDetailsPage() {
 
   const token = localStorage.getItem("token");
 
-  useEffect(() => {
-    const fetchTicket = async () => {
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_SERVER_URL}/tickets/${id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        const data = await res.json();
-        if (res.ok) {
-          setTicket(data.ticket);
-        } else {
-          alert(data.message || "Failed to fetch ticket");
+  const fetchTicket = async () => {
+    try {
+      const res = await axios.get(
+        `${process.env.VITE_SERVER_URL}/tickets/${id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-      } catch (err) {
-        console.error(err);
-        alert("Something went wrong");
-      } finally {
-        setLoading(false);
+      );
+      if (res.status === 200) {
+        setTicket(res.data.ticket);
+      } else {
+        alert(res.data.message || "Failed to fetch ticket");
       }
-    };
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchTicket();
   }, [id]);
 
@@ -89,9 +89,87 @@ export default function TicketDetailsPage() {
                 Created At: {new Date(ticket.createdAt).toLocaleString()}
               </p>
             )}
+
+            {ticket.resolution && (
+              <div>
+                <div className="divider">Resolution</div>
+                <div className="bg-green-900/20 p-4 rounded border border-green-500/30">
+                  <h4 className="font-bold text-green-500 mb-2">🎉 Resolved</h4>
+                  <p>{ticket.resolution}</p>
+                </div>
+              </div>
+            )}
+
+            {ticket.status !== "RESOLVED" &&
+              ["admin", "moderator"].includes(JSON.parse(localStorage.getItem("user") || "{}").role) && (
+                <div className="mt-6 border-t pt-4 border-gray-700">
+                  <h4 className="font-semibold mb-2">Moderator Actions</h4>
+                  <ResolveTicketForm ticketId={ticket._id} onResolved={() => fetchTicket()} />
+                </div>
+              )}
           </>
         )}
       </div>
     </div>
+  );
+}
+
+function ResolveTicketForm({ ticketId, onResolved }) {
+  const [resolution, setResolution] = useState("");
+  const [loading, setLoading] = useState(false);
+  const token = localStorage.getItem("token");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await axios.post(
+        `${process.env.VITE_SERVER_URL}/tickets/${ticketId}/resolve`,
+        { resolution },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (res.status === 200) {
+        onResolved(); // Refresh parent
+      } else {
+        alert("Failed to resolve ticket");
+      }
+    } catch (err) {
+      console.error("Resolve error:", err);
+      alert("Error resolving ticket");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-base-200 p-4 rounded-lg">
+      <div className="form-control">
+        <label className="label">
+          <span className="label-text">Resolution Notes</span>
+        </label>
+        <textarea
+          className="textarea textarea-bordered h-24"
+          placeholder="Describe how the ticket was resolved..."
+          value={resolution}
+          onChange={(e) => setResolution(e.target.value)}
+          required
+        ></textarea>
+      </div>
+      <div className="form-control mt-4">
+        <button
+          type="submit"
+          className={`btn btn-success ${loading ? "loading" : ""}`}
+          disabled={loading}
+        >
+          {loading ? "Resolving..." : "Mark as Resolved"}
+        </button>
+      </div>
+    </form>
   );
 }

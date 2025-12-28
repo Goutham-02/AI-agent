@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 
 export default function Tickets() {
   const [form, setForm] = useState({ title: "", description: "" });
@@ -10,12 +11,10 @@ export default function Tickets() {
 
   const fetchTickets = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/tickets`, {
+      const res = await axios.get(`${process.env.VITE_SERVER_URL}/tickets`, {
         headers: { Authorization: `Bearer ${token}` },
-        method: "GET",
       });
-      const data = await res.json();
-      setTickets(data.tickets || []);
+      setTickets(res.data || []);
     } catch (err) {
       console.error("Failed to fetch tickets:", err);
     }
@@ -33,22 +32,21 @@ export default function Tickets() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/tickets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(form),
-      });
+      const res = await axios.post(
+        `${process.env.VITE_SERVER_URL}/tickets`,
+        form,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-      const data = await res.json();
-
-      if (res.ok) {
+      if (res.status === 201) {
         setForm({ title: "", description: "" });
-        fetchTickets(); // Refresh list
+        fetchTickets();
       } else {
-        alert(data.message || "Ticket creation failed");
+        alert(res.data.message || "Ticket creation failed");
       }
     } catch (err) {
       alert("Error creating ticket");
