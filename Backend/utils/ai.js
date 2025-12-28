@@ -51,9 +51,11 @@ const analyzeTicket = async (ticket) => {
 
     console.log(response.raw);
     try {
-        return JSON.parse(raw.trim());
+        const text = response.raw || response.text || "";
+        const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+        return JSON.parse(cleanText);
     } catch (error) {
-        console.error("Failed to parse AI JSON:", raw);
+        console.error("Failed to parse AI JSON:", response.raw);
         throw error;
     }
 };
